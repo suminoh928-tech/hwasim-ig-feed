@@ -21,6 +21,7 @@ jobs:
       - name: Fetch posts
         env:
           IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          IG_USER_ID: ${{ vars.IG_USER_ID }}
         run: python scripts/fetch_feed.py
       - name: Commit changes
         run: |
@@ -31,7 +32,8 @@ jobs:
           git push
 
   refresh-token:
-    if: github.event.schedule == '40 0 * * 1'
+    # Facebook 페이지 토큰(IG_USER_ID 설정 시)은 만료되지 않으므로 연장하지 않는다.
+    if: github.event.schedule == '40 0 * * 1' && vars.IG_USER_ID == ''
     runs-on: ubuntu-latest
     steps:
       - name: Refresh long-lived token

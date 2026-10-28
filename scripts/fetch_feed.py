@@ -22,7 +22,13 @@ def get(url):
 def main():
     token = os.environ["IG_TOKEN"]
     q = urllib.parse.urlencode({"fields": FIELDS, "limit": COUNT, "access_token": token})
-    data = json.loads(get(f"https://graph.instagram.com/me/media?{q}"))["data"]
+    # IG_USER_ID가 있으면 Facebook 페이지 토큰 방식, 없으면 Instagram 로그인 토큰 방식.
+    user_id = os.environ.get("IG_USER_ID", "").strip()
+    if user_id:
+        url = f"https://graph.facebook.com/v21.0/{user_id}/media?{q}"
+    else:
+        url = f"https://graph.instagram.com/me/media?{q}"
+    data = json.loads(get(url))["data"]
 
     IMG.mkdir(parents=True, exist_ok=True)
     posts, keep = [], set()

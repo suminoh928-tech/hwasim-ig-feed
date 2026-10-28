@@ -1,0 +1,51 @@
+name: Update Instagram feed
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"   # 6시간마다 게시물 갱신
+    - cron: "40 0 * * 1"     # 매주 월요일 토큰 연장 (60일 만료 방지)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.event.schedule != '40 0 * * 1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch posts
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+        run: python scripts/fetch_feed.py
+      - name: Commit changes
+        run: |
+          git config user.name "hwasim-feed-bot"
+          git config user.email "hwasim-feed-bot@users.noreply.github.com"
+          git add docs
+          git diff --cached --quiet || git commit -m "Update Instagram feed"
+          git push
+
+  refresh-token:
+    if: github.event.schedule == '40 0 * * 1'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh long-lived token
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          REPO: ${{ github.repository }}
+        run: |
+          resp=$(curl -fsS "https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${IG_TOKEN}")
+          new=$(echo "$resp" | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+          echo "::add-mask::$new"
+          if [ "$new" != "$IG_TOKEN" ]; then
+            gh secret set IG_TOKEN --repo "$REPO" --body "$new"
+            echo "Token changed and saved"
+          else
+            echo "Token extended (same value)"
+          fi
